@@ -25,7 +25,7 @@ export const ActivityLogsPage = () => {
 
   const fetchActivityLogs = async () => {
     try {
-      const response = await axios.get(`${baseUrl}/activity-logs"`);
+      const response = await axios.get(`${baseUrl}/activity-logs`);
       setLogs(response.data.data); 
     } catch (error) {
       console.error("Error fetching activity logs:", error);
