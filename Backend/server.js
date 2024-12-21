@@ -8,6 +8,7 @@ const hpp = require('hpp');
 const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
 const errorHandler = require('./middleware/errorHandler');
+const { Server } = require('socket.io');
 
 //Load env
 dotenv.config({path: './config/.env'});
@@ -18,51 +19,64 @@ connectDB();
 
 const app = express();
 
+// Create an HTTP server for Express
+const http = require('http');
+const server = http.createServer(app);
 
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:5173/',
+    methods: ['GET', 'POST'],
+  },
+});
+
+// Middleware
 app.use(express.json());
 app.use(cookieParser());
-
-//Sanitize data
 app.use(mongoSanitize());
-
-//Set security headers
 app.use(helmet());
-
-//Prevent http param pollution
 app.use(hpp());
-
-//Enable CORS
 app.use(cors());
 
-
+// Routes
 const userRoutes = require('./routes/user');
 const authRoutes = require('./routes/auth');
 const todoRoutes = require('./routes/todo');
 const activityLogsRoutes = require('./routes/activityLogs');
-
 
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/todo', todoRoutes);
 app.use('/api/v1/activity-logs', activityLogsRoutes);
 
-
-//Error Handler ( use before routes )
+// Error Handler (use before routes)
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001
+// Handle Socket.IO events
+io.on('connection', (socket) => {
+  console.log(`New client connected: ${socket.id}`);
 
+  // Handle custom events
+  socket.on('message', (data) => {
+    console.log(`Message received: ${data}`);
+    io.emit('message', `Server: Received "${data}"`);
+  });
 
-const server = app.listen(PORT, () => {
-    console.log(`Server is running in ${ process.env.NODE_ENV} mode on port ${PORT}`)
-})
-
-//Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-    console.log(`Error: ${err.message}`);
-//    Close server $ exit process
-    console.close(() => process.exit(1));
+  // Handle client disconnect
+  socket.on('disconnect', () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
 });
 
-//Prevent XSS(Cross Site Scripting)
-app.use(xss());
+// Start the server
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`Server is running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  console.log(`Error: ${err.message}`);
+  server.close(() => process.exit(1));
+});
